@@ -42,3 +42,40 @@ def install(agent: str, target_dir: str | None = None) -> int:
     print()
     print(notes)
     return 0
+
+
+def uninstall(agent: str) -> int:
+    try:
+        adapter = _resolve(agent)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    # 先反注册全局钩子（若支持）
+    unreg_note = ""
+    if hasattr(adapter, "unregister_global_hook"):
+        d = adapter.install_dir(None)
+        driver = d / "hook_driver.sh"
+        try:
+            unreg_note = adapter.unregister_global_hook(driver)
+        except Exception as e:  # noqa: BLE001
+            unreg_note = f"反注册钩子时出错：{e}"
+    # 再删除生成的技能/文件目录
+    removed = []
+    try:
+        d = adapter.install_dir(None)
+        if d.exists():
+            import shutil
+
+            shutil.rmtree(d)
+            removed.append(str(d))
+    except Exception as e:  # noqa: BLE001
+        print(f"删除目录失败：{e}", file=sys.stderr)
+    print(f"== 卸载 词趣判官 适配 {agent} ==")
+    if unreg_note:
+        print(unreg_note)
+    if removed:
+        print("已删除：")
+        for f in removed:
+            print(f"  - {f}")
+    print("提示：核心包（ci-pj 命令）仍可用；如需彻底移除请 pip uninstall ci-prompt-judge。")
+    return 0

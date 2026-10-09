@@ -118,9 +118,22 @@ ci-pj install workbuddy
 | Claude Code | `.claude/commands/pj-*.md` + 合并 `settings.json` 的 `UserPromptSubmit` 钩子 | `ci-pj hook` 读取 stdin |
 | Codex | `.codex/commands/pj-*.md`（按版本核对） | 注册 PreTool/UserPrompt 钩子 |
 | Hermes | `.hermes/commands/pj-*.md` | 输入预处理挂载 `ci-pj hook` |
-| WorkBuddy | `~/.workbuddy/skills/ci-prompt-judge/SKILL.md` | 钩子（可选）注册 `ci-pj hook` |
+| WorkBuddy | `~/.workbuddy/skills/ci-prompt-judge/SKILL.md` | **安装时自动注册**全局 `UserPromptSubmit` 钩子（每次提交消息自动点评） |
 
 > 钩子仅做**装饰性输出**，不影响原 Prompt 执行；不想自动点评时删除钩子即可，仍可手动 `/pj-judge`。
+
+### WorkBuddy 自动注册全局钩子（重点）
+
+`ci-pj install workbuddy` 会做三件事：
+
+1. 把技能 `SKILL.md` 写入 `~/.workbuddy/skills/ci-prompt-judge/`（用户级，全项目可用）；
+2. 写入钩子驱动脚本 `hook_driver.sh`；
+3. **自动把 `UserPromptSubmit` 钩子合并进 `~/.workbuddy/settings.json`**（带时间戳备份、幂等去重）。
+
+这样**每次你在 WorkBuddy 提交消息，都会先自动运行 `ci-pj hook` 做趣味前置点评**，无需在当前对话显式触发，也不再依赖「技能被 agent 主动调用」。重启 WorkBuddy 后生效。
+
+- 卸载：`ci-pj uninstall workbuddy`（移除钩子 + 删除技能目录，保留核心包）。
+- `ci-pj hook` 已支持解析钩子传入的 JSON 事件（提取 `prompt` 字段），也兼容手动 `ci-pj hook --prompt "..."` 或管道纯文本。
 
 ---
 

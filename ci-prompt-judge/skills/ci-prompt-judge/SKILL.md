@@ -1,6 +1,6 @@
 ---
 name: ci-prompt-judge
-description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对提示词做趣味点评与 1-10 分完整性评分，或使用 /pj-mode、/pj-status、/pj-update、/pj-judge 等指令时使用。也可作为每次对话的前置装饰层，先点评再放行原 Prompt。
+description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对提示词做趣味点评与 1-10 分完整性评分，或使用 /pj-mode、/pj-status、/pj-update、/pj-judge 等指令时使用。安装时已自动注册全局 UserPromptSubmit 钩子，每次用户输入前自动点评。
 ---
 
 # 词趣判官（ci-prompt-judge）
@@ -9,13 +9,13 @@ description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对
 
 ## 何时使用
 
-1. 用户显式使用 `/pj-` 前缀指令（优先级最高）：
+1. 安装后已**自动注册全局 UserPromptSubmit 钩子**（`~/.workbuddy/settings.json`）：每次你在 WorkBuddy 提交消息，都会先自动运行 `ci-pj hook` 做趣味前置点评，**无需在当前对话显式触发**。
+2. 用户显式使用 `/pj-` 前缀指令（优先级最高）：
    - `/pj-mode 渣女 | 激励师 | 贴吧老哥 | off` —— 切换/关闭人设
    - `/pj-status` —— 查询当前状态
    - `/pj-update <人设> | /pj-update-all` —— 联网增量更新话术（需 WebSearch）
    - `/pj-judge <文本>` —— 手动评判一段 Prompt
-2. 用户希望对自己的提示词获得趣味点评与完整性评分。
-3. （可选）作为前置装饰层：每次用户输入后，先运行 `ci-pj hook` 输出趣味评判，再照常回答。
+3. 用户希望对自己的提示词获得趣味点评与完整性评分（也可手动调用 `ci-pj run`）。
 
 ## 如何执行（依赖本地 ci-pj 命令）
 
@@ -33,7 +33,7 @@ description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对
 **调用：**
 - 评判/指令分发：`ci-pj run "<用户输入>"`
 - 仅诊断（不输出评判，看匹配与分数）：`ci-pj diagnose "<文本>"`
-- 前置钩子：`ci-pj hook --prompt "<文本>"`（或管道读 stdin）
+- 前置钩子（已由全局钩子自动调用）：`ci-pj hook`（读取 stdin 的 hook 事件 JSON；亦支持 `--prompt "<文本>"` 或管道纯文本）
 
 > 若环境中没有 `ci-pj`，请提示用户先安装，不要自行臆造评分。
 

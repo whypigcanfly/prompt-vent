@@ -76,13 +76,36 @@ def cmd_diagnose(args) -> int:
     return 0
 
 
+def _extract_prompt(raw: str) -> str:
+    """从 hook 输入提取 prompt 文本。
+
+    WorkBuddy / Claude Code 的钩子通过 stdin 传入 JSON 事件（含 prompt 字段）。
+    也兼容直接管道传入纯文本（老用法 / 手动测试）。
+    """
+    raw = raw.strip()
+    if not raw:
+        return ""
+    try:
+        obj = json.loads(raw)
+    except Exception:
+        return raw
+    if isinstance(obj, dict):
+        for key in ("prompt", "message", "text"):
+            val = obj.get(key)
+            if isinstance(val, str) and val:
+                return val
+    return raw
+
+
 def cmd_hook(args) -> int:
     """前置拦截钩子：读取 prompt，输出评判（装饰性、不阻塞主流程）。
 
+    - 输入可为 JSON 事件（WorkBuddy/Claude Code 钩子）或纯文本（手动测试）
     - 控制指令：执行并原样输出，退出码 0（由宿主侧 /pj 命令优先拦截更佳）
     - 常规 prompt：输出评判结果，退出码 0，放行原 prompt 进入主流程
     """
-    prompt = args.prompt or "".join(sys.stdin.readlines())
+    raw = args.prompt or "".join(sys.stdin.readlines())
+    prompt = _extract_prompt(raw)
     engine = _build_engine()
     result = engine.process(prompt)
     text = result.get("text", "")
@@ -97,6 +120,11 @@ def cmd_hook(args) -> int:
 def cmd_install(args) -> int:
     from adapter import installer
     return installer.install(args.agent, args.target_dir)
+
+
+def cmd_uninstall(args) -> int:
+    from adapter import installer
+    return installer.uninstall(args.agent)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -130,8 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     pi = sub.add_parser("install", help="安装到指定 Agent")
     pi.add_argument("agent", help="claude_code | codex | hermes | workbuddy")
-    pi.add_argument("--target-dir", default=None, help="自定义安装目录")
+    pi.add_argument("--target-dir", default=None, help="自定义安装目录（仅生成文件，不改全局配置）")
     pi.set_defaults(func=cmd_install)
+
+    pu2 = sub.add_parser("uninstall", help="卸载指定 Agent 的适配（含全局钩子）")
+    pu2.add_argument("agent", help="workbuddy（目前支持反注册全局钩子）")
+    pu2.set_defaults(func=cmd_uninstall)
     return p
 
 
