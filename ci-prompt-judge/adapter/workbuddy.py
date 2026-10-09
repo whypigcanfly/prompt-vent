@@ -81,7 +81,7 @@ description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对
 
 ## 扩展
 
-规则（rule/rules.json）、人设话术（speech/personas.json）、评分权重（config/config.default.json）全部可配置、可插拔，无需改核心代码即可新增人设/规则/话术。
+规则（core/data/rule/rules.json）、人设话术（core/data/speech/personas.json）、评分权重（core/data/config/config.default.json）全部可配置、可插拔，无需改核心代码即可新增人设/规则/话术。
 """
 
 

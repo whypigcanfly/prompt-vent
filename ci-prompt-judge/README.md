@@ -47,7 +47,7 @@
 ├───────────────────┼─────────────────────────┤
 │  持久化 storage/    │ JSON(默认) / 内存 / SQLite│
 └───────────────────┴─────────────────────────┘
-        配置层 config/ · 规则层 rule/ · 话术层 speech/
+        配置层 core/data/config · 规则层 core/data/rule · 话术层 core/data/speech
 ```
 
 指令优先级（PRD 十四，自上而下）：
@@ -60,15 +60,17 @@
 ```
 ci-prompt-judge/
 ├── core/        # 核心内核：engine / rules_matcher / scoring / speech_renderer / formatter
+│   └── data/    # 内置资源包（随包发布，importlib.resources 读取）
+│       ├── config/   # 默认配置 config.default.json（模式/权重/去重/更新/存储/日志/安全）
+│       ├── rule/     # 特征规则库 + 评分规则 + 白名单 rules.json
+│       └── speech/   # 角色话术库 personas.json（渣女/激励师/贴吧老哥）
 ├── adapter/     # 多 Agent 适配层：claude_code / codex / hermes / workbuddy / installer
-├── config/      # 默认配置 config.default.json（模式/权重/去重/更新/存储/日志/安全）
-├── rule/        # 特征规则库 + 评分规则 + 白名单 rules.json
-├── speech/      # 角色话术库 personas.json（渣女/激励师/贴吧老哥）
 ├── service/     # 扩展服务：logger / dedup / update（联网增量更新）
 ├── storage/     # 持久化存储 store.py（JSON/内存，SQLite 可扩展）
+├── skills/      # 权威 SKILL.md（WorkBuddy 技能，单一数据源）
 ├── log/         # 日志存储目录
 ├── docs/        # 文档
-├── main.py      # CLI 入口（ci-pj）
+├── main.py      # CLI 入口（顶层模块，ci-pj 命令入口点 main:main）
 ├── install.sh   # 一键安装脚本
 └── pyproject.toml
 ```
@@ -90,9 +92,14 @@ bash install.sh
 
 ```bash
 cd ci-prompt-judge
-pip install -e .          # 提供 ci-pj 命令
+pip install -e .          # 提供 ci-pj 命令（可编辑安装，开发推荐）
 ci-pj status              # 验证安装
 ```
+
+> **打包说明**：`pyproject.toml` 已将 `main.py` 声明为 `py_modules`、并把 `config/rule/speech` 内置资源归入 `core/data/` 包（含 `package_data`）。因此**两种安装方式都可用**：
+> - 可编辑安装 `pip install -e .`（开发态，源码根加入 `sys.path`）；
+> - 普通/ wheel 安装 `pip install .` 或 `pip install ci-prompt-judge`（资源随 `core.data` 包发布，由 `importlib.resources` 读取，不再依赖源码布局）。
+> 仍可通过环境变量 `CI_PJ_CONFIG_DIR` / `CI_PJ_RULE_DIR` / `CI_PJ_SPEECH_DIR` 覆盖内置资源目录。
 
 ---
 
@@ -140,7 +147,7 @@ ci-pj update 渣女          # 联网增量更新话术（需宿主 WebSearch）
 
 ## 八、评分说明
 
-四维加权（默认权重，可在 `config/config.default.json` 调整）：
+四维加权（默认权重，可在 `core/data/config/config.default.json` 调整）：
 **意图 30% / 特异性 25% / 结构 25% / 鲁棒性 20%**，总分 1–10。
 
 - **超短且非专业**的提示词会被软上限压低（避免敷衍被误判高分）。
@@ -153,15 +160,15 @@ ci-pj update 渣女          # 联网增量更新话术（需宿主 WebSearch）
 
 ### 加一个人设
 
-在 `speech/personas.json` 增加一个 persona 节点，配置 `style` / `taboo` / `rule_speeches`（按规则 ID 绑定）/ `fallback` 即可，无需改代码。
+在 `core/data/speech/personas.json` 增加一个 persona 节点，配置 `style` / `taboo` / `rule_speeches`（按规则 ID 绑定）/ `fallback` 即可，无需改代码。
 
 ### 加一条特征规则
 
-在 `rule/rules.json` 的 `feature_rules` 增加一条（`id` / `type` / `weight` / `status`），`type` 支持 `length` / `keyword` / `structure` / `regex`。
+在 `core/data/rule/rules.json` 的 `feature_rules` 增加一条（`id` / `type` / `weight` / `status`），`type` 支持 `length` / `keyword` / `structure` / `regex`。
 
 ### 调整评分权重
 
-改 `config/config.default.json` 的 `scoring.weights`，实时生效。
+改 `core/data/config/config.default.json` 的 `scoring.weights`，实时生效。
 
 ---
 

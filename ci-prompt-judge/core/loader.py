@@ -37,14 +37,14 @@ def _deep_merge(base: Dict, override: Dict) -> Dict:
 
 @lru_cache(maxsize=16)
 def load_config() -> Dict[str, Any]:
-    cfg = _load_json(pathutil.config_dir() / "config.default.json")
+    cfg = json.loads(pathutil.read_text("config", "config.default.json"))
     user = _load_json(os.path.expanduser("~/.ci-pj/config.user.json"))
     return _deep_merge(cfg, user)
 
 
 @lru_cache(maxsize=16)
 def load_rules() -> Dict[str, Any]:
-    rules = _load_json(pathutil.rule_dir() / "rules.json")
+    rules = json.loads(pathutil.read_text("rule", "rules.json"))
     user = _load_json(os.path.expanduser("~/.ci-pj/rules.user.json"))
     # 用户规则按 id 合并覆盖
     if "feature_rules" in user:
@@ -60,7 +60,7 @@ def load_rules() -> Dict[str, Any]:
 
 @lru_cache(maxsize=16)
 def load_personas() -> Dict[str, Any]:
-    base = _load_json(pathutil.speech_dir() / "personas.json")
+    base = json.loads(pathutil.read_text("speech", "personas.json"))
     user_path = os.path.expanduser(pathutil.default_user_speech_path())
     user = _load_json(user_path)
     if not user:

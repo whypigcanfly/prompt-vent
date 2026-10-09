@@ -19,14 +19,29 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/ci-prompt-judge"
-Repository = "https://github.com/your-org/ci-prompt-judge"
+Homepage = "https://github.com/whypigcanfly/prompt-vent"
+Repository = "https://github.com/whypigcanfly/prompt-vent"
 
 [project.scripts]
 ci-pj = "main:main"
 
 [tool.setuptools]
-packages = ["core", "adapter", "service", "storage"]
+packages = [
+    "core",
+    "core.data",
+    "core.data.config",
+    "core.data.rule",
+    "core.data.speech",
+    "adapter",
+    "service",
+    "storage",
+]
+# 入口点 "main:main" 引用顶层模块 main.py；必须显式声明为 py_module，
+# 否则非可编辑安装时 setuptools 不会把它拷进 site-packages，导致 ci-pj 脚本 import main 失败。
+py_modules = ["main"]
 
-[tool.setuptools.exclude-package-data]
-# 配置文件随包发布，便于 importlib.resources 读取
+[tool.setuptools.package-data]
+# 内置资源随包发布，供 importlib.resources 读取
+"core.data.config" = ["*.json"]
+"core.data.rule" = ["*.json"]
+"core.data.speech" = ["*.json"]
