@@ -28,6 +28,30 @@ ci-pj run "帮我写一封体面的辞职信"
 
 ---
 
+## 🔌 在 WorkBuddy 中安装词趣判官
+
+词趣判官已提供 WorkBuddy 原生技能（仓库内 `ci-prompt-judge/skills/ci-prompt-judge/SKILL.md`）。安装方式任选其一：
+
+**方式一：通过 URL 导入（图形界面，最省事）**
+1. 打开 WorkBuddy → 左侧「技能」面板（或 设置 → 技能管理）。
+2. 选择 **「通过 URL 导入 / Import from URL」**。
+3. 填入仓库地址 `https://github.com/whypigcanfly/prompt-vent`，确认自动拉取。
+4. 在技能管理面板确认「词趣判官（ci-prompt-judge）」已**启用**。
+
+**方式二：手动放置 / 命令行生成**
+- 用户级（所有项目可用）：把技能目录放到 `~/.workbuddy/skills/ci-prompt-judge/`
+- 项目级（团队共享）：放到 `<你的项目>/.workbuddy/skills/ci-prompt-judge/`
+- 或克隆仓库后执行：`ci-pj install workbuddy`（自动写入用户级技能目录）。
+
+> ⚠️ 技能只是「外壳」，真正的评分引擎是 Python 包 `ci-prompt-judge`。无论哪种方式，**都必须先安装核心包**：
+> ```bash
+> git clone https://github.com/whypigcanfly/prompt-vent.git
+> cd prompt-vent/ci-prompt-judge && pip install -e .
+> ```
+> 安装后用户说「评判一下我的提示词」或输入 `/pj-mode 渣女` 即可触发。
+
+---
+
 ## 🤝 贡献
 
 欢迎提 Issue / PR，一起丰富 prompt-vent 的工具箱。

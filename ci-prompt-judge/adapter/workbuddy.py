@@ -12,7 +12,25 @@ from typing import List, Tuple
 
 from adapter.base import AgentAdapter
 
-SKILL_MD = """---
+# 权威 SKILL.md 位置：仓库内 skills/ci-prompt-judge/SKILL.md
+# 优先读取该文件（单一数据源，避免与内嵌副本漂移）；文件缺失时回退到内嵌副本。
+_CANONICAL_SKILL = (
+    Path(__file__).resolve().parent.parent
+    / "skills"
+    / "ci-prompt-judge"
+    / "SKILL.md"
+)
+
+
+def _load_skill_md() -> str:
+    if _CANONICAL_SKILL.exists():
+        return _CANONICAL_SKILL.read_text(encoding="utf-8")
+    return _SKILL_MD_FALLBACK
+
+
+SKILL_MD = _load_skill_md()
+
+_SKILL_MD_FALLBACK = """---
 name: ci-prompt-judge
 description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对提示词做趣味点评与 1-10 分完整性评分，或使用 /pj-mode、/pj-status、/pj-update、/pj-judge 等指令时使用。也可作为每次对话的前置装饰层，先点评再放行原 Prompt。
 ---
