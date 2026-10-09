@@ -81,6 +81,12 @@ def _extract_prompt(raw: str) -> str:
 
     WorkBuddy / Claude Code 的钩子通过 stdin 传入 JSON 事件（含 prompt 字段）。
     也兼容直接管道传入纯文本（老用法 / 手动测试）。
+
+    提取策略：
+    - 空输入 -> 返回空（静默放行）
+    - 非 JSON（纯文本）-> 原样作为 prompt（手动/管道直传场景）
+    - JSON 且含 prompt/message/text 字段 -> 取该字段
+    - JSON 但无已知 prompt 字段 -> 返回空（静默放行，避免把整段 JSON 当 prompt 点评）
     """
     raw = raw.strip()
     if not raw:
@@ -94,7 +100,8 @@ def _extract_prompt(raw: str) -> str:
             val = obj.get(key)
             if isinstance(val, str) and val:
                 return val
-    return raw
+    # 是 JSON 但不是可识别的 prompt 字段：视为无法提取，静默放行
+    return ""
 
 
 def cmd_hook(args) -> int:
@@ -106,6 +113,10 @@ def cmd_hook(args) -> int:
     """
     raw = args.prompt or "".join(sys.stdin.readlines())
     prompt = _extract_prompt(raw)
+    if not prompt:
+        # 无法从事件中提取 prompt（如钩子事件格式与本插件预期不同），静默放行，
+        # 不输出对任何内容的评判，也不阻断用户原始 Prompt。
+        return 0
     engine = _build_engine()
     result = engine.process(prompt)
     text = result.get("text", "")

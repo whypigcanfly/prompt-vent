@@ -46,8 +46,24 @@ HOOK_DRIVER_SH = """#!/usr/bin/env bash
 # 词趣判官 · WorkBuddy 全局钩子驱动（由 UserPromptSubmit 钩子调用）
 # 职责：定位 ci-pj 命令，把 hook 事件（JSON，通过 stdin 传入）交给 `ci-pj hook` 处理。
 # 退出码 0 = 放行（装饰性输出，不拦截用户原始 Prompt）。
+#
+# 为什么不用单纯的 `command -v ci-pj`：
+#   WorkBuddy 执行钩子时的 shell 环境 PATH 不一定包含用户的 venv bin 或 ~/.local/bin，
+#   直接 command -v 可能找不到 ci-pj 而静默跳过。这里按优先级显式探测已知安装位置。
 set -u
-CI_PJ="$(command -v ci-pj 2>/dev/null || true)"
+CI_PJ=""
+# 优先级：① 本机托管 Python 的 venv 安装（pip install 的规范位置，含最新代码）
+#         ② 用户自带的 wrapper（~/.local/bin/ci-pj）
+#         ③ 回退到 PATH 中任何 ci-pj
+for c in \\
+  "$HOME/.workbuddy/binaries/python/envs/default/bin/ci-pj" \\
+  "$HOME/.local/bin/ci-pj" \\
+  "$(command -v ci-pj 2>/dev/null || true)"; do
+  if [ -n "$c" ] && [ -x "$c" ]; then
+    CI_PJ="$c"
+    break
+  fi
+done
 if [ -z "$CI_PJ" ]; then
   # ci-pj 未安装：静默放行，不影响正常使用
   exit 0
