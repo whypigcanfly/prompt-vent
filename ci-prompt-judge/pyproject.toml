@@ -36,9 +36,9 @@ packages = [
     "service",
     "storage",
 ]
-# 入口点 "main:main" 引用顶层模块 main.py；必须显式声明为 py_module，
+# 入口点 "main:main" 引用顶层模块 main.py；必须显式声明为 py-modules（setuptools 的 kebab-case 键），
 # 否则非可编辑安装时 setuptools 不会把它拷进 site-packages，导致 ci-pj 脚本 import main 失败。
-py_modules = ["main"]
+py-modules = ["main"]
 
 [tool.setuptools.package-data]
 # 内置资源随包发布，供 importlib.resources 读取
