@@ -62,8 +62,6 @@ def _load_skill_md() -> str:
     return _SKILL_MD_FALLBACK
 
 
-SKILL_MD = _load_skill_md()
-
 _SKILL_MD_FALLBACK = """---
 name: ci-prompt-judge
 description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对提示词做趣味点评与 1-10 分完整性评分，或使用 /pj-mode、/pj-status、/pj-update、/pj-judge 等指令时使用。安装时已自动注册全局 UserPromptSubmit 钩子，每次用户输入前自动点评。
@@ -118,6 +116,8 @@ description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对
 规则（core/data/rule/rules.json）、人设话术（core/data/speech/personas.json）、评分权重（core/data/config/config.default.json）全部可配置、可插拔，无需改核心代码即可新增人设/规则/话术。
 """
 
+# 在 _SKILL_MD_FALLBACK 定义之后再调用，避免安装后包内缺失权威文件时回退到未定义变量
+SKILL_MD = _load_skill_md()
 
 class WorkBuddyAdapter(AgentAdapter):
     name = "workbuddy"
