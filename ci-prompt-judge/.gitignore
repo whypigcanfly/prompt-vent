@@ -1,0 +1,19 @@
+# 运行时用户数据（不应入库）
+state.json
+speech.user.json
+rules.user.json
+config.user.json
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# 虚拟环境
+.venv/
+venv/
+.env

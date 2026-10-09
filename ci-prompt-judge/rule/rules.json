@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "feature_rules": [
+    {
+      "id": "R01",
+      "name": "超短提示词",
+      "type": "length",
+      "op": "<=",
+      "value": 15,
+      "weight": 60,
+      "status": "enabled",
+      "tags": ["short"],
+      "note": "命中即使用「小小的也很可爱」专属台词（PRD 十、专属要求）"
+    },
+    {
+      "id": "R02",
+      "name": "文本生成类",
+      "type": "keyword",
+      "keywords": ["写", "帮我写", "生成", "创作", "起草", "润色", "文案"],
+      "weight": 80,
+      "status": "enabled",
+      "tags": ["text"]
+    },
+    {
+      "id": "R03",
+      "name": "AI绘图类",
+      "type": "keyword",
+      "keywords": ["画图", "绘画", "图片", "生成图", "comfyui", "画一张", "出图", "插画"],
+      "weight": 75,
+      "status": "enabled",
+      "tags": ["image"]
+    },
+    {
+      "id": "R04",
+      "name": "代码/运维类",
+      "type": "keyword",
+      "keywords": ["代码", "java", "yaml", "docker", "脚本", "编程", "函数", "api", "bug", "sql", "python", "shell", "k8s", "linux"],
+      "weight": 82,
+      "status": "enabled",
+      "tags": ["code", "professional"],
+      "whitelist": true
+    },
+    {
+      "id": "R05",
+      "name": "知识提问类",
+      "type": "keyword",
+      "keywords": ["为什么", "是什么", "怎么", "如何", "原理", "区别", "解释"],
+      "weight": 72,
+      "status": "enabled",
+      "tags": ["qa"]
+    },
+    {
+      "id": "R07",
+      "name": "超长精细提示词",
+      "type": "length",
+      "op": ">",
+      "value": 800,
+      "weight": 90,
+      "status": "enabled",
+      "tags": ["long"]
+    },
+    {
+      "id": "R08",
+      "name": "结构化提示词",
+      "type": "structure",
+      "weight": 90,
+      "status": "enabled",
+      "tags": ["structured"]
+    }
+  ],
+  "scoring_rules": {
+    "dimension_keywords": {
+      "intent": ["写", "生成", "画", "为什么", "怎么", "如何", "帮我", "请", "分析", "解释", "做", "设计", "翻译", "总结", "对比", "创作", "评估", "实现", "修复"],
+      "specificity": ["必须", "要求", "格式", "步骤", "例子", "例如", "具体", "详细", "约束", "限制", "风格", "语气", "长度", "不要", "避免", "只", "仅", "精确", "指定", "用", "基于", "段", "条", "点", "项", "分别", "正式", "明确", "用途", "目标", "场景"],
+      "structure": ["\n", "以下", "如下", "格式", "结构", "分成", "第一", "第二", "一、", "1.", "1、", "- ", "* ", "```", "段", "条", "点", "第", "分"],
+      "robustness": ["背景", "上下文", "场景", "前提", "假设", "目标", "受众", "读者", "用途", "输入", "输出", "示例", "角色", "平台", "版本", "环境", "目的"]
+    },
+    "short_penalty_rules": {
+      "R01_soft_cap": 4.0,
+      "note": "超短且非白名单时，总分软上限压低，避免「敷衍」被误判高分"
+    }
+  },
+  "whitelist": {
+    "enabled": true,
+    "keywords": ["代码", "cli", "命令", "docker", "kubectl", "git", "sql", "bash", "shell", "yaml", "json", "正则", "regex", "api", "linux", "终端", "脚本"],
+    "regex": ["^[a-zA-Z][\\w\\- ]*\\s+(-\\w|--\\w)"],
+    "cancel_short_penalty": true,
+    "base_floor": 7.0,
+    "note": "专业极简指令豁免「短文本低分惩罚」，判定为意图清晰、精准高效（PRD 十七）"
+  },
+  "conflict_resolution": {
+    "policy": "weight_first_then_id",
+    "merge_mode": false,
+    "note": "多规则命中时仅执行权重最高者；权重相同按 ID 升序；merge_mode 可开启多话术合并"
+  }
+}

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ci-prompt-judge"
+version = "0.1.0"
+description = "词趣判官 · 一个无侵入的 Prompt 趣味前置评判插件，支持 Claude Code / Codex / Hermes / Workbuddy 等 Agent 安装"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["prompt", "judge", "agent", "plugin", "llm", "fun"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/ci-prompt-judge"
+Repository = "https://github.com/your-org/ci-prompt-judge"
+
+[project.scripts]
+ci-pj = "main:main"
+
+[tool.setuptools]
+packages = ["core", "adapter", "service", "storage"]
+
+[tool.setuptools.exclude-package-data]
+# 配置文件随包发布，便于 importlib.resources 读取

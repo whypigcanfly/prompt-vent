@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "plugin_version": "0.1.0",
+  "default_mode": "激励师",
+  "modes": ["渣女", "激励师", "贴吧老哥", "off"],
+  "scoring": {
+    "weights": {
+      "intent": 0.30,
+      "specificity": 0.25,
+      "structure": 0.25,
+      "robustness": 0.20
+    },
+    "short_penalty_enabled": true,
+    "whitelist_floor": 7.0
+  },
+  "dedup": {
+    "threshold": 0.85,
+    "short_strict_len": 20,
+    "long_relax_len": 50
+  },
+  "update": {
+    "max_per_update": 20,
+    "max_per_day": 10,
+    "timeout_sec": 15,
+    "retry": 1
+  },
+  "storage": {
+    "mode": "json",
+    "path": "~/.ci-pj/state.json",
+    "speech_path": "~/.ci-pj/speech.user.json"
+  },
+  "log": {
+    "level": "INFO",
+    "retention_days": 7,
+    "dir": "~/.ci-pj/log"
+  },
+  "safety": {
+    "enabled": true,
+    "blocklist": [],
+    "note": "默认空列表，仅作占位；违规判定建议接入宿主 Agent 的安全层，本插件只做轻量关键词拦截兜底。"
+  },
+  "command_prefix": "/pj-"
+}
