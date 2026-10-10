@@ -110,6 +110,9 @@ _DEFAULT_LEAD_INSTRUCTION = (
     "不要加引号，也不要把本条要求本身说出来。"
 )
 
+# hook 事件名（WorkBuddy 与 Claude Code 同构，均支持 hookSpecificOutput.hookEventName）
+_HOOK_EVENT_NAME = "UserPromptSubmit"
+
 
 def _hook_cfg(engine: Engine) -> dict:
     return (engine.cfg or {}).get("hook", {}) or {}
@@ -124,12 +127,50 @@ def _hook_lead_instruction(engine: Engine) -> str:
     return _hook_cfg(engine).get("lead_output_instruction") or _DEFAULT_LEAD_INSTRUCTION
 
 
+def _hook_output_format(engine: Engine) -> str:
+    """hook 输出格式：json（默认，宿主可解析 systemMessage 上屏）或 text（旧行为）。"""
+    return str(_hook_cfg(engine).get("output_format", "json")).lower()
+
+
+def _first_line(text: str) -> str:
+    """取首个非空行：评判行的「上屏」版本（【XX语气评判｜...】话术）。"""
+    for line in text.splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return text.strip()
+
+
+def _emit_hook_json(engine: Engine, kind: str, text: str) -> int:
+    """以 JSON 输出 hook 结果（WorkBuddy / Claude Code 同构协议）。
+
+    - judge / intercept：systemMessage=评判行（宿主对话 UI 上屏，早于模型回复）；
+      additionalContext=完整评判块（注入模型上下文，替代裸 stdout，suppressOutput 双保险）。
+    - 控制指令（mode/status/update 等）：仅 systemMessage 展示结果，不注入模型上下文。
+    """
+    payload: dict = {"suppressOutput": True}
+    if kind in ("judge", "intercept"):
+        payload["systemMessage"] = _first_line(text)
+        context = text
+        if _hook_lead_enabled(engine):
+            context = f"{context}\n\n{_hook_lead_instruction(engine)}"
+        payload["hookSpecificOutput"] = {
+            "hookEventName": _HOOK_EVENT_NAME,
+            "additionalContext": context,
+        }
+    else:
+        payload["systemMessage"] = text
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0
+
+
 def cmd_hook(args) -> int:
     """前置拦截钩子：读取 prompt，输出评判（装饰性、不阻塞主流程）。
 
     - 输入可为 JSON 事件（WorkBuddy/Claude Code 钩子）或纯文本（手动测试）
     - 控制指令：执行并原样输出，退出码 0（由宿主侧 /pj 命令优先拦截更佳）
     - 常规 prompt：输出评判结果，退出码 0，放行原 prompt 进入主流程
+    - 输出格式由 hook.output_format 决定：json（默认，systemMessage 上屏）/ text（旧行为）
     """
     raw = args.prompt or "".join(sys.stdin.readlines())
     prompt = _extract_prompt(raw)
@@ -139,13 +180,15 @@ def cmd_hook(args) -> int:
         return 0
     engine = _build_engine()
     result = engine.process(prompt)
-    text = result.get("text", "")
-    if result.get("kind") == "none":
-        return 0  # off 模式：静默放行
-    if not text:
-        return 0
-
     kind = result.get("kind", "")
+    text = result.get("text", "")
+    if kind == "none" or not text:
+        return 0  # off 模式：静默放行
+
+    if _hook_output_format(engine) == "json":
+        return _emit_hook_json(engine, kind, text)
+
+    # text 模式：旧行为（纯文本 stdout，仅进模型上下文，不上屏）
     # 「首行输出」仅作用于评判/拦截结果：让宿主 Agent 把评判行渲染到回复第一行，
     # 之后再给出思考与正式回答。控制指令（mode/status/update）不套用该要求。
     if kind in ("judge", "intercept") and _hook_lead_enabled(engine):

@@ -50,6 +50,17 @@ def uninstall(agent: str) -> int:
     except ValueError as e:
         print(str(e), file=sys.stderr)
         return 2
+    # 适配器提供定制卸载（如 claude_code：只清理本插件产物，不动用户其他命令文件）
+    if hasattr(adapter, "uninstall"):
+        print(f"== 卸载 词趣判官 适配 {agent} ==")
+        try:
+            note = adapter.uninstall()
+        except Exception as e:  # noqa: BLE001
+            print(f"卸载失败：{e}", file=sys.stderr)
+            return 1
+        print(note)
+        print("提示：核心包（ci-pj 命令）仍可用；如需彻底移除请 pip uninstall ci-prompt-judge。")
+        return 0
     # 先反注册全局钩子（若支持）
     unreg_note = ""
     if hasattr(adapter, "unregister_global_hook"):
