@@ -62,28 +62,59 @@ fi
 
 echo "正在安装 ci-pj 命令行工具 (来源: ${MODE})..."
 # 统一用常规安装（不用 -e）：老版本 pip（<21.3）不支持 PEP 660 可编辑安装，
-# 且常规安装不依赖源码目录存活，对终端用户更健壮
-$PIP install "$SRC_DIR" --quiet && echo "ci-pj 安装完成 ✅" || {
+# 且常规安装不依赖源码目录存活，对终端用户更健壮。
+# 加 --upgrade：PATH 上可能残留旧版 ci-pj（issue #9），确保本机注册的是新版
+$PIP install --upgrade "$SRC_DIR" --quiet && echo "ci-pj 安装完成 ✅" || {
   if [ "$MODE" = "local" ]; then
-    echo "安装失败，请手动执行：pip install $SRC_DIR" >&2
+    echo "安装失败，请手动执行：pip install --upgrade $SRC_DIR" >&2
   else
-    echo "安装失败，请手动执行：pip install git+$REPO_URL#subdirectory=$PKG_SUBDIR" >&2
+    echo "安装失败，请手动执行：pip install --upgrade git+$REPO_URL#subdirectory=$PKG_SUBDIR" >&2
   fi
   exit 1
 }
 
-# 定位 ci-pj 可执行（与 pip 同 bin 目录优先）
-CI_PJ_BIN="$(command -v ci-pj 2>/dev/null || true)"
-if [ -z "$CI_PJ_BIN" ]; then
-  PIP_BIN="$(command -v "${PIP%% *}" 2>/dev/null || true)"
-  if [ -n "$PIP_BIN" ] && [ -x "$(dirname "$PIP_BIN")/ci-pj" ]; then
-    CI_PJ_BIN="$(dirname "$PIP_BIN")/ci-pj"
+# 定位刚安装的 ci-pj 可执行。
+# 优先级：① pip 同 bin 目录 ② Python user-site bin（pip --user 安装落点，常不在 PATH，
+# issue #9：此目录里的新版被旧版残留遮蔽） ③ PATH 上的 ci-pj（可能为旧版残留，仅兜底）
+find_ci_pj() {
+  local cand
+  local pip_bin
+  pip_bin="$(command -v "${PIP%% *}" 2>/dev/null || true)"
+  if [ -n "$pip_bin" ] && [ -x "$(dirname "$pip_bin")/ci-pj" ]; then
+    dirname "$pip_bin"
+    return 0
   fi
+  cand="$(python3 -m site --user-base 2>/dev/null)/bin"
+  if [ -x "$cand/ci-pj" ]; then
+    echo "$cand"
+    return 0
+  fi
+  cand="$(command -v ci-pj 2>/dev/null || true)"
+  if [ -n "$cand" ]; then
+    dirname "$cand"
+    return 0
+  fi
+  return 1
+}
+
+PJ_BIN_DIR=""
+if PJ_BIN_DIR="$(find_ci_pj)"; then
+  CI_PJ_BIN="$PJ_BIN_DIR/ci-pj"
+  # PATH 上另有别的 ci-pj（旧版残留）→ 显式警告，避免用户误用旧逻辑
+  PATH_PJ="$(command -v ci-pj 2>/dev/null || true)"
+  if [ -n "${PATH_PJ}" ] && [ "${PATH_PJ}" != "${CI_PJ_BIN}" ]; then
+    echo "⚠️  PATH 上的 ci-pj (${PATH_PJ}) 为旧版残留，本次安装将使用新版：${CI_PJ_BIN}" >&2
+    echo "    建议清理旧版避免混淆：rm ${PATH_PJ}" >&2
+  fi
+else
+  CI_PJ_BIN=""
 fi
 if [ -z "$CI_PJ_BIN" ]; then
   echo "未找到 ci-pj 可执行文件，请检查 pip 安装日志。" >&2
   exit 1
 fi
+
+echo "ci-pj 版本：$("$CI_PJ_BIN" --version 2>/dev/null || echo '未知（旧版无 --version，说明 PATH 上是旧残留，请按上方提示清理）')"
 
 # ---------- 3) 确定要适配的 Agent ----------
 TARGETS=()

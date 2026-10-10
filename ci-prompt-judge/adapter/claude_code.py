@@ -100,6 +100,18 @@ class ClaudeCodeAdapter(AgentAdapter):
             "timeout": HOOK_TIMEOUT,
         }
 
+    @staticmethod
+    def _is_own_hook(command: str, driver_cmd: str) -> bool:
+        """判定某钩子 command 是否属于本插件。
+
+        覆盖两种形态：
+        - 驱动脚本路径（现行版本注册的 ``~/.claude/ci-pj/hook_driver.sh``）
+        - 直接调用 ci-pj 的旧式条目（如 ``~/.local/bin/ci-pj hook``，
+          早期手工配置残留；文件被清理后会报 No such file or directory）
+        """
+        cmd = (command or "").strip()
+        return cmd == driver_cmd or cmd.endswith("ci-pj hook")
+
     @classmethod
     def register_global_hook(cls, driver_path: Path) -> str:
         """把 UserPromptSubmit 钩子合并进 ~/.claude/settings.json（幂等）。返回说明文本。"""
@@ -121,13 +133,16 @@ class ClaudeCodeAdapter(AgentAdapter):
         hooks = data.setdefault("hooks", {})
         groups = hooks.setdefault(HOOK_EVENT, [])
 
-        # 去重：移除任何已包含本驱动命令的钩子组，避免重复注册
+        # 去重：按 hook 级过滤本插件条目（含旧式直接调用残留），保留同组其他钩子。
+        # 不能按组删除：旧条目可能与其他工具的钩子混在同一组，整组删除会误伤（issue #9）
         filtered = []
         for grp in groups:
             hs = (grp.get("hooks") or []) if isinstance(grp, dict) else []
-            if any(h.get("command") == cmd for h in hs):
-                continue
-            filtered.append(grp)
+            kept = [h for h in hs if not cls._is_own_hook(h.get("command", ""), cmd)]
+            if kept:
+                grp = dict(grp)
+                grp["hooks"] = kept
+                filtered.append(grp)
         filtered.append({"hooks": [cls._hook_entry(driver_path)]})
         hooks[HOOK_EVENT] = filtered
         data["hooks"] = hooks
@@ -163,10 +178,15 @@ class ClaudeCodeAdapter(AgentAdapter):
         removed = 0
         for grp in groups:
             hs = (grp.get("hooks") or []) if isinstance(grp, dict) else []
-            if any(h.get("command") == cmd for h in hs):
-                removed += 1
-                continue
-            kept.append(grp)
+            # hook 级过滤：只移除本插件条目（驱动脚本 / 旧式直接调用残留），
+            # 保留同组其他工具的钩子（issue #9）
+            kept_hooks = [h for h in hs
+                          if not cls._is_own_hook(h.get("command", ""), cmd)]
+            removed += len(hs) - len(kept_hooks)
+            if kept_hooks:
+                grp = dict(grp)
+                grp["hooks"] = kept_hooks
+                kept.append(grp)
         if removed == 0:
             return "~/.claude/settings.json 中未找到本插件钩子，无需卸载。"
         if kept:
