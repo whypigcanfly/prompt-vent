@@ -45,6 +45,25 @@ class AgentAdapter:
             return Path(target) / self.name
         return Path.cwd() / ".ci-pj-adapt" / self.name
 
+    def hook_driver_path(self, target: str | None = None) -> Path:
+        """全局钩子驱动脚本路径（installer 卸载反注册时使用）。"""
+        return self.install_dir(target) / "hook_driver.sh"
+
+    def uninstall_files(self) -> List[str]:
+        """卸载时删除本插件生成的文件/目录。
+
+        默认整目录删除 install_dir(None)（该目录为本插件专有时安全）；
+        目录与宿主其他文件共用时（如 Claude Code 的 ~/.claude/commands），
+        子类必须覆盖为精确删除，避免误删用户自有文件。
+        """
+        import shutil
+
+        d = self.install_dir(None)
+        if d.exists():
+            shutil.rmtree(d)
+            return [str(d)]
+        return []
+
     # ---------- 默认生成流程（子类可整体覆盖）----------
     def generate(self, target: str | None = None) -> Tuple[List[str], str]:
         d = self.install_dir(target)

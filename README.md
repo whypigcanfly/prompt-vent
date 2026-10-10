@@ -18,6 +18,14 @@
 
 ## 🚀 快速开始（以词趣判官为例）
 
+一行命令自动安装（以 Claude Code 为例，无需 clone，自动注册全局钩子）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/whypigcanfly/prompt-vent/main/ci-prompt-judge/install.sh | bash -s -- claude_code
+```
+
+或手动安装：
+
 ```bash
 git clone https://github.com/whypigcanfly/prompt-vent.git
 cd prompt-vent/ci-prompt-judge
