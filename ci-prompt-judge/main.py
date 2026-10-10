@@ -199,7 +199,7 @@ def build_parser() -> argparse.ArgumentParser:
     pi.set_defaults(func=cmd_install)
 
     pu2 = sub.add_parser("uninstall", help="卸载指定 Agent 的适配（含全局钩子）")
-    pu2.add_argument("agent", help="workbuddy（目前支持反注册全局钩子）")
+    pu2.add_argument("agent", help="claude_code | workbuddy（目前支持反注册全局钩子）")
     pu2.set_defaults(func=cmd_uninstall)
     return p
 
