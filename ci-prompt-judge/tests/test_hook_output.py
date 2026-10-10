@@ -267,6 +267,44 @@ class TestClaudeCodeHookRegister(unittest.TestCase):
         data = json.loads(settings.read_text("utf-8"))
         self.assertNotIn("UserPromptSubmit", data.get("hooks", {}))
 
+    def test_register_keeps_foreign_hooks_in_mixed_group(self):
+        # issue #9：旧式直接调用残留与其他工具钩子同组时，
+        # 注册须按 hook 级过滤——清理残留且不误删同组外部钩子
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({
+            "hooks": {"UserPromptSubmit": [{"hooks": [
+                {"type": "command", "command": "echo orca"},
+                {"type": "command", "command": f"{self.root}/.local/bin/ci-pj hook"},
+            ]}]},
+        }), encoding="utf-8")
+        driver = self.root / ".claude" / "ci-pj" / "hook_driver.sh"
+        self.adapter.register_global_hook(driver)
+        data = json.loads(settings.read_text("utf-8"))
+        groups = data["hooks"]["UserPromptSubmit"]
+        cmds = [h["command"] for grp in groups for h in grp["hooks"]]
+        self.assertIn("echo orca", cmds)  # 同组外部钩子保留
+        self.assertIn(str(driver), cmds)
+        # 旧式直接调用残留被清理
+        self.assertFalse(any(c.endswith("ci-pj hook") for c in cmds))
+
+    def test_unregister_keeps_foreign_hooks_in_mixed_group(self):
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir(parents=True)
+        driver = self.root / ".claude" / "ci-pj" / "hook_driver.sh"
+        settings.write_text(json.dumps({
+            "hooks": {"UserPromptSubmit": [{"hooks": [
+                {"type": "command", "command": "echo orca", "timeout": 10},
+                {"type": "command", "command": str(driver), "timeout": 30},
+            ]}]},
+        }), encoding="utf-8")
+        note = self.adapter.unregister_global_hook(driver)
+        data = json.loads(settings.read_text("utf-8"))
+        groups = data["hooks"]["UserPromptSubmit"]
+        cmds = [h["command"] for grp in groups for h in grp["hooks"]]
+        self.assertEqual(cmds, ["echo orca"])  # 只移除自己的，外部钩子原样保留
+        self.assertIn("已移除", note)
+
     def test_uninstall_files_keeps_foreign_commands(self):
         _, _ = self._gen()
         foreign = self.root / ".claude" / "commands" / "other-cmd.md"
