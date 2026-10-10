@@ -104,6 +104,26 @@ def _extract_prompt(raw: str) -> str:
     return ""
 
 
+_DEFAULT_LEAD_INSTRUCTION = (
+    "[词趣判官·输出要求] 请把上方第一行以「【」开头的评判行，原样作为你本次回复的"
+    "第一行输出；随后空一行，再开始你的思考与正式回答。不要改写、不要省略、"
+    "不要加引号，也不要把本条要求本身说出来。"
+)
+
+
+def _hook_cfg(engine: Engine) -> dict:
+    return (engine.cfg or {}).get("hook", {}) or {}
+
+
+def _hook_lead_enabled(engine: Engine) -> bool:
+    """是否启用「评判作为回复首行」的输出指令（config.hook.lead_output）。"""
+    return bool(_hook_cfg(engine).get("lead_output", False))
+
+
+def _hook_lead_instruction(engine: Engine) -> str:
+    return _hook_cfg(engine).get("lead_output_instruction") or _DEFAULT_LEAD_INSTRUCTION
+
+
 def cmd_hook(args) -> int:
     """前置拦截钩子：读取 prompt，输出评判（装饰性、不阻塞主流程）。
 
@@ -122,9 +142,15 @@ def cmd_hook(args) -> int:
     text = result.get("text", "")
     if result.get("kind") == "none":
         return 0  # off 模式：静默放行
-    if text:
-        # 评判/指令结果输出到 stdout，宿主可显示为系统提示
-        print(text)
+    if not text:
+        return 0
+
+    kind = result.get("kind", "")
+    # 「首行输出」仅作用于评判/拦截结果：让宿主 Agent 把评判行渲染到回复第一行，
+    # 之后再给出思考与正式回答。控制指令（mode/status/update）不套用该要求。
+    if kind in ("judge", "intercept") and _hook_lead_enabled(engine):
+        text = f"{text}\n\n{_hook_lead_instruction(engine)}"
+    print(text)
     return 0
 
 

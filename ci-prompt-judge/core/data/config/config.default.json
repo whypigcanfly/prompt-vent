@@ -39,5 +39,10 @@
     "blocklist": [],
     "note": "默认空列表，仅作占位；违规判定建议接入宿主 Agent 的安全层，本插件只做轻量关键词拦截兜底。"
   },
-  "command_prefix": "/pj-"
+  "command_prefix": "/pj-",
+  "hook": {
+    "lead_output": true,
+    "lead_output_instruction": "[词趣判官·输出要求] 请把上方第一行以「【」开头的评判行，原样作为你本次回复的第一行输出；随后空一行，再开始你的思考与正式回答。不要改写、不要省略、不要加引号，也不要把本条要求本身说出来。",
+    "note": "lead_output=true 时，ci-pj hook 会在评判结果后追加一条给宿主 Agent 的输出指令，使评判出现在回复首行；设为 false 则只输出评判块本身（装饰性注入）。"
+  }
 }
