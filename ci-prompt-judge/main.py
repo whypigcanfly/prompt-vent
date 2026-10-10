@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 from core import loader
 from core.engine import Engine
@@ -76,32 +76,50 @@ def cmd_diagnose(args) -> int:
     return 0
 
 
-def _extract_prompt(raw: str) -> str:
-    """从 hook 输入提取 prompt 文本。
+def _parse_event(raw: str) -> Tuple[str, str]:
+    """解析 hook 输入，返回 (prompt, 事件名)。
 
-    WorkBuddy / Claude Code 的钩子通过 stdin 传入 JSON 事件（含 prompt 字段）。
-    也兼容直接管道传入纯文本（老用法 / 手动测试）。
+    兼容三类来源：
+    - WorkBuddy / Claude Code：JSON 顶层 prompt/message/text 字段
+    - Hermes（NousResearch/hermes-agent）Shell Hook：pre_llm_call 事件，
+      用户输入在 JSON 的 user_message 或 extra.user_message 字段，
+      事件名在 hook_event_name 字段
+    - 纯文本管道直传（老用法 / 手动测试）
 
     提取策略：
-    - 空输入 -> 返回空（静默放行）
+    - 空输入 -> 返回 ("", "")（静默放行）
     - 非 JSON（纯文本）-> 原样作为 prompt（手动/管道直传场景）
-    - JSON 且含 prompt/message/text 字段 -> 取该字段
-    - JSON 但无已知 prompt 字段 -> 返回空（静默放行，避免把整段 JSON 当 prompt 点评）
+    - JSON 且含已知 prompt 字段 -> 取该字段（优先顶层，其次 extra）
+    - JSON 但无已知 prompt 字段 -> 返回 ("", 事件名)（静默放行，避免把整段 JSON 当 prompt 点评）
     """
     raw = raw.strip()
     if not raw:
-        return ""
+        return "", ""
     try:
         obj = json.loads(raw)
     except Exception:
-        return raw
+        return raw, ""
     if isinstance(obj, dict):
-        for key in ("prompt", "message", "text"):
+        event = obj.get("hook_event_name")
+        event = event if isinstance(event, str) else ""
+        for key in ("prompt", "message", "text", "user_message"):
             val = obj.get(key)
             if isinstance(val, str) and val:
-                return val
+                return val, event
+        # Hermes Shell Hook：事件参数集中在 extra 里（user_message 等）
+        extra = obj.get("extra")
+        if isinstance(extra, dict):
+            for key in ("user_message", "prompt", "message", "text"):
+                val = extra.get(key)
+                if isinstance(val, str) and val:
+                    return val, event
     # 是 JSON 但不是可识别的 prompt 字段：视为无法提取，静默放行
-    return ""
+    return "", ""
+
+
+def _extract_prompt(raw: str) -> str:
+    """从 hook 输入提取 prompt 文本（详见 _parse_event）。"""
+    return _parse_event(raw)[0]
 
 
 _DEFAULT_LEAD_INSTRUCTION = (
@@ -127,12 +145,14 @@ def _hook_lead_instruction(engine: Engine) -> str:
 def cmd_hook(args) -> int:
     """前置拦截钩子：读取 prompt，输出评判（装饰性、不阻塞主流程）。
 
-    - 输入可为 JSON 事件（WorkBuddy/Claude Code 钩子）或纯文本（手动测试）
+    - 输入可为 JSON 事件（WorkBuddy / Claude Code / Hermes 钩子）或纯文本（手动测试）
     - 控制指令：执行并原样输出，退出码 0（由宿主侧 /pj 命令优先拦截更佳）
     - 常规 prompt：输出评判结果，退出码 0，放行原 prompt 进入主流程
+    - Hermes pre_llm_call 事件：stdout 输出 {"context": ...}，由 Hermes 注入本轮
+      用户消息（文档约定：非 JSON / 空输出 = 静默 no-op）
     """
     raw = args.prompt or "".join(sys.stdin.readlines())
-    prompt = _extract_prompt(raw)
+    prompt, event = _parse_event(raw)
     if not prompt:
         # 无法从事件中提取 prompt（如钩子事件格式与本插件预期不同），静默放行，
         # 不输出对任何内容的评判，也不阻断用户原始 Prompt。
@@ -150,6 +170,13 @@ def cmd_hook(args) -> int:
     # 之后再给出思考与正式回答。控制指令（mode/status/update）不套用该要求。
     if kind in ("judge", "intercept") and _hook_lead_enabled(engine):
         text = f"{text}\n\n{_hook_lead_instruction(engine)}"
+
+    if event == "pre_llm_call":
+        # Hermes Shell Hook：只有 {"context": ...} 会被注入用户消息；
+        # 控制指令输出不注入（控制走技能 /pj- 斜杠命令），静默 no-op。
+        if kind in ("judge", "intercept"):
+            print(json.dumps({"context": text}, ensure_ascii=False))
+        return 0
     print(text)
     return 0
 
@@ -199,7 +226,8 @@ def build_parser() -> argparse.ArgumentParser:
     pi.set_defaults(func=cmd_install)
 
     pu2 = sub.add_parser("uninstall", help="卸载指定 Agent 的适配（含全局钩子）")
-    pu2.add_argument("agent", help="claude_code | workbuddy（目前支持反注册全局钩子）")
+    pu2.add_argument(
+        "agent", help="claude_code | hermes | workbuddy（支持反注册全局钩子）")
     pu2.set_defaults(func=cmd_uninstall)
     return p
 

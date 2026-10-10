@@ -24,6 +24,12 @@
 curl -fsSL https://raw.githubusercontent.com/whypigcanfly/prompt-vent/main/ci-prompt-judge/install.sh | bash -s -- claude_code
 ```
 
+Hermes（NousResearch/hermes-agent）同理（issue #4）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/whypigcanfly/prompt-vent/main/ci-prompt-judge/install.sh | bash -s -- hermes
+```
+
 或手动安装：
 
 ```bash
