@@ -128,7 +128,7 @@ ci-pj install workbuddy
 |-------|-------------|----------|
 | Claude Code | `~/.claude/commands/pj-*.md`（用户级） | **安装时自动注册**全局 `UserPromptSubmit` 钩子（每次提交消息自动点评） |
 | Codex | `.codex/commands/pj-*.md`（按版本核对） | 注册 PreTool/UserPrompt 钩子 |
-| Hermes | `.hermes/commands/pj-*.md` | 输入预处理挂载 `ci-pj hook` |
+| Hermes | `~/.hermes/skills/ci-prompt-judge/SKILL.md`（用户级，自动注册斜杠命令） | **安装时自动注册** Shell Hook `pre_llm_call`（每轮用户消息自动点评，评判以 `{"context": ...}` 注入） |
 | WorkBuddy | `~/.workbuddy/skills/ci-prompt-judge/SKILL.md` | **安装时自动注册**全局 `UserPromptSubmit` 钩子（每次提交消息自动点评） |
 
 > 钩子仅做**装饰性输出**，不影响原 Prompt 执行；不想自动点评时运行 `ci-pj uninstall <agent>` 移除钩子即可，仍可手动 `/pj-judge`。
