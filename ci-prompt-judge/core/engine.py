@@ -34,11 +34,10 @@ class Engine:
         )
         self.logger = logger
         self.prefix = self.cfg.get("command_prefix", "/pj-")
-        self.valid_modes = self.cfg.get("modes", ["渣女", "激励师", "贴吧老哥", "off"])
 
     # ---------- 指令识别（PRD 四、十四）----------
     def parse_command(self, text: str) -> Optional[Tuple[str, str]]:
-        """返回 (cmd_type, arg) 或 None。cmd_type ∈ mode|status|update。"""
+        """返回 (cmd_type, arg) 或 None。cmd_type ∈ mode|status|update|judge。"""
         t = text.strip()
         if not t.startswith(self.prefix):
             return None
@@ -49,6 +48,8 @@ class Engine:
             return ("status", "")
         if body.startswith("update"):
             return ("update", body[len("update"):].strip())
+        if body.startswith("judge"):
+            return ("judge", body[len("judge"):].strip())
         return ("unknown", body)
 
     # ---------- 安全拦截（优先级最高）----------
@@ -70,6 +71,11 @@ class Engine:
                 return self._do_mode(arg)
             if ctype == "status":
                 return self._do_status()
+            if ctype == "judge":
+                if arg:
+                    return self._do_judge(arg)
+                return {"kind": "judge_help",
+                        "text": "用法：/pj-judge <文本> —— 对一段 Prompt 做趣味评判"}
             return {"kind": "unknown_command", "text": f"未知指令：{text}"}
 
         # 常规 Prompt：先安全拦截
@@ -119,14 +125,16 @@ class Engine:
         if arg == "off" or arg in ("关闭",):
             self.store.set_mode("off")
             return {"kind": "mode", "text": "词趣判官已关闭，后续不再评判与打分。"}
-        if arg in ("渣女", "激励师", "贴吧老哥"):
+        # 人设白名单改为动态：人设池（内置 + 用户级 speech.user.json 追加）里存在的即可切换
+        personas = (self.personas or {}).get("personas", {})
+        if arg in personas:
             self.store.set_mode(arg)
             if self.logger:
                 self.logger.info("runtime", f"切换模式->{arg}", persona=arg)
             return {"kind": "mode", "text": f"词趣判官已切换为「{arg}」语气。"}
         return {
             "kind": "mode_help",
-            "text": "用法：/pj-mode 渣女 | 激励师 | 贴吧老哥 | off",
+            "text": f"用法：/pj-mode {' | '.join(personas) or '人设名'} | off",
         }
 
     # ---------- 状态查询（PRD 四）----------
@@ -135,13 +143,14 @@ class Engine:
         persona_count = len(self.personas.get("personas", {}))
         rule_count = len([r for r in self.rules.get("feature_rules", [])
                           if r.get("status", "enabled") == "enabled"])
+        persona_names = " / ".join(self.personas.get("personas", {}))
         text = (
             f"词趣判官状态：\n"
             f"· 当前模式：{mode}\n"
-            f"· 内置人设：{persona_count} 个（渣女 / 激励师 / 贴吧老哥）\n"
+            f"· 可用人设：{persona_count} 个（{persona_names}）\n"
             f"· 启用规则：{rule_count} 条\n"
             f"· 存储模式：{self.cfg.get('storage', {}).get('mode')}\n"
-            f"· 指令：/pj-mode <人设|off> · /pj-status · /pj-update <人设> · /pj-update-all"
+            f"· 指令：/pj-mode <人设|off> · /pj-status · /pj-update <人设> · /pj-update-all · /pj-judge <文本>"
         )
         return {"kind": "status", "text": text, "mode": mode}
 
