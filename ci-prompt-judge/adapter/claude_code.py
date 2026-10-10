@@ -9,6 +9,9 @@
 安装（不带 --target-dir）时自动把钩子合并进 ``~/.claude/settings.json``
 （带时间戳备份、幂等去重），无需用户手动编辑配置——对齐 WorkBuddy 适配器的
 自动注册体验（issue #1：一键自动安装并自动配置 Claude Code hook）。
+
+``ci-pj hook`` 以 JSON 输出（issue #2）：``systemMessage``=评判行（终端 hook 行可见）+
+``hookSpecificOutput.additionalContext`` 注入模型上下文，与 WorkBuddy 同构。
 """
 from __future__ import annotations
 
@@ -42,13 +45,15 @@ HOOK_TIMEOUT = 30
 HOOK_DRIVER_SH = """#!/usr/bin/env bash
 # 词趣判官 · Claude Code 全局钩子驱动（由 UserPromptSubmit 钩子调用）
 # 职责：定位 ci-pj 命令，把 hook 事件（JSON，通过 stdin 传入）交给 `ci-pj hook` 处理。
-# 退出码 0 = 放行（装饰性输出，不拦截用户原始 Prompt）。
+# 退出码 0 = 放行（评判通过 JSON systemMessage 上屏，不拦截用户原始 Prompt）。
 set -u
 CI_PJ=""
-# 优先级：① 用户自带 wrapper（~/.local/bin/ci-pj，含 pipx --user 安装）
-#         ② pipx 规范安装位置
-#         ③ 回退到 PATH 中任何 ci-pj
+# 优先级：① 本机托管 Python 的 venv 安装（WorkBuddy 托管 venv，pip install 规范位置）
+#         ② 用户自带 wrapper（~/.local/bin/ci-pj，含 pipx --user 安装）
+#         ③ pipx 规范安装位置
+#         ④ 回退到 PATH 中任何 ci-pj
 for c in \\
+  "$HOME/.workbuddy/binaries/python/envs/default/bin/ci-pj" \\
   "$HOME/.local/bin/ci-pj" \\
   "$HOME/.local/pipx/venvs/ci-prompt-judge/bin/ci-pj" \\
   "$(command -v ci-pj 2>/dev/null || true)"; do
@@ -232,6 +237,7 @@ class ClaudeCodeAdapter(AgentAdapter):
         notes = (
             "Claude Code 安装说明：\n"
             "1) 确保 ci-pj 已安装且可被找到：`pip install ci-prompt-judge` 或 `pip install -e .`\n"
+            "   （钩子驱动按 托管venv → ~/.local/bin → pipx → PATH 顺序自动定位）\n"
             f"2) 命令文件已写入 {d}（pj-mode / pj-status / pj-update / pj-judge）\n"
         )
         if target:
@@ -251,7 +257,9 @@ class ClaudeCodeAdapter(AgentAdapter):
         notes += (
             "3) 已自动注册全局 UserPromptSubmit 钩子（~/.claude/settings.json），"
             "每次提交消息自动前置点评。\n"
-            "4) 使用：/pj-mode 渣女 切换人设；普通对话会自动前缀趣味评判后放行。\n"
+            "4) 评判行通过 hook JSON systemMessage 上屏（终端 hook 行可见），"
+            "并经 additionalContext 注入模型上下文（issue #2）。\n"
+            "5) 使用：/pj-mode 渣女 切换人设；普通对话会自动前缀趣味评判后放行。\n"
             "注意：钩子仅做装饰性输出，不影响原 Prompt 执行；如不想自动评判，"
             "运行 ci-pj uninstall claude_code 移除钩子（仍可手动 /pj-judge）。\n"
             "---- 钩子注册 ----\n" + hook_note
