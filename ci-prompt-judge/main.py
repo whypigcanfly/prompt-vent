@@ -237,9 +237,20 @@ def cmd_uninstall(args) -> int:
     return installer.uninstall(args.agent)
 
 
+def _pkg_version() -> str:
+    try:
+        from importlib.metadata import version
+        return version("ci-prompt-judge")
+    except Exception:
+        # 源码目录直跑（未 pip 安装）时读不到已注册的发行版元数据，回退 pyproject 版本
+        return "0.1.0"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ci-pj", description="词趣判官 · Prompt 趣味前置评判插件")
+    p.add_argument("--version", action="version",
+                   version=f"ci-pj {_pkg_version()}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pr = sub.add_parser("run", help="完整处理一段文本（指令或评判）")
