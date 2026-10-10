@@ -152,67 +152,86 @@ class TestHookTextFallback(unittest.TestCase):
 
 
 class TestClaudeCodeHookRegister(unittest.TestCase):
-    """claude_code 适配器：项目级钩子幂等注册/卸载。"""
+    """claude_code 适配器：用户级全局钩子幂等注册/卸载（隔离 HOME）。"""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        from adapter.claude_code import ClaudeCodeAdapter
+        import adapter.claude_code as cc
 
-        self.adapter = ClaudeCodeAdapter()
-        self.target = str(self.root)
+        self.cc = cc
+        # 隔离：Path.home() 与 GLOBAL_SETTINGS 都指向临时目录
+        self._patchers = [
+            mock.patch.object(Path, "home", return_value=self.root),
+            mock.patch.object(cc, "GLOBAL_SETTINGS", self.root / ".claude" / "settings.json"),
+        ]
+        for p in self._patchers:
+            p.start()
+        self.adapter = cc.ClaudeCodeAdapter()
 
     def tearDown(self):
+        for p in self._patchers:
+            p.stop()
         self.tmp.cleanup()
 
     def _gen(self):
-        return self.adapter.generate(self.target)
+        return self.adapter.generate(None)
 
-    def test_generate_with_target_no_settings_change(self):
+    def test_generate_default_registers_global_hook(self):
         created, _ = self._gen()
-        # 仅生成文件，不写 settings.json（--target-dir 模式）
-        self.assertFalse((self.root / ".claude" / "settings.json").exists())
-        self.assertTrue((self.root / ".claude" / "hooks" / "ci-pj-hook.sh").exists())
+        # 4 命令文件 + 1 钩子驱动，均写入用户级目录
+        self.assertEqual(len(created), 5)
         self.assertTrue((self.root / ".claude" / "commands" / "pj-mode.md").exists())
-        self.assertEqual(len(created), 5)  # 4 命令文件 + 1 钩子驱动
+        self.assertTrue((self.root / ".claude" / "ci-pj" / "hook_driver.sh").exists())
+        data = json.loads((self.root / ".claude" / "settings.json").read_text("utf-8"))
+        groups = data["hooks"]["UserPromptSubmit"]
+        self.assertEqual(len(groups), 1)
+        self.assertTrue(groups[0]["hooks"][0]["command"].endswith("hook_driver.sh"))
+
+    def test_generate_with_target_no_global_change(self):
+        target = self.root / "pkg"
+        created, _ = self.adapter.generate(str(target))
+        self.assertEqual(len(created), 5)
+        # --target-dir 模式不写全局 settings.json
+        self.assertFalse((self.root / ".claude" / "settings.json").exists())
 
     def test_register_idempotent_with_backup(self):
-        # 写入既有 settings.json，验证合并不破坏原有内容
         settings = self.root / ".claude" / "settings.json"
         settings.parent.mkdir(parents=True)
         settings.write_text(
             json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}),
             encoding="utf-8",
         )
-        driver = self.root / ".claude" / "hooks" / "ci-pj-hook.sh"
-        self.adapter.register_project_hook(driver, self.target)
-        self.adapter.register_project_hook(driver, self.target)  # 幂等
+        driver = self.root / ".claude" / "ci-pj" / "hook_driver.sh"
+        self.adapter.register_global_hook(driver)
+        self.adapter.register_global_hook(driver)  # 幂等
         data = json.loads(settings.read_text("utf-8"))
         groups = data["hooks"]["UserPromptSubmit"]
         self.assertEqual(len(groups), 1)  # 去重：不重复注册
         self.assertEqual(groups[0]["hooks"][0]["command"], str(driver))
         self.assertIn("Stop", data["hooks"])  # 原有钩子保留
-        self.assertTrue(settings.with_name("settings.json.ci-pj-bak-").parent.exists())
+        self.assertTrue(list(settings.parent.glob("settings.json.ci-pj-bak-*")))
 
     def test_unregister_removes_only_own_hook(self):
         settings = self.root / ".claude" / "settings.json"
         settings.parent.mkdir(parents=True)
         settings.write_text("{}", encoding="utf-8")
-        driver = self.root / ".claude" / "hooks" / "ci-pj-hook.sh"
-        self.adapter.register_project_hook(driver, self.target)
-        note = self.adapter.unregister_project_hook(self.target)
+        driver = self.root / ".claude" / "ci-pj" / "hook_driver.sh"
+        self.adapter.register_global_hook(driver)
+        note = self.adapter.unregister_global_hook(driver)
         self.assertIn("已移除", note)
         data = json.loads(settings.read_text("utf-8"))
         self.assertNotIn("UserPromptSubmit", data.get("hooks", {}))
 
-    def test_uninstall_keeps_foreign_commands(self):
+    def test_uninstall_files_keeps_foreign_commands(self):
         _, _ = self._gen()
         foreign = self.root / ".claude" / "commands" / "other-cmd.md"
         foreign.write_text("x", encoding="utf-8")
-        note = self.adapter.uninstall(self.target)
+        removed = self.adapter.uninstall_files()
         self.assertFalse((self.root / ".claude" / "commands" / "pj-mode.md").exists())
         self.assertTrue(foreign.exists())  # 用户其他命令不受影响
-        self.assertFalse((self.root / ".claude" / "hooks" / "ci-pj-hook.sh").exists())
+        self.assertFalse((self.root / ".claude" / "ci-pj" / "hook_driver.sh").exists())
+        self.assertTrue(any("hook_driver.sh" in f for f in removed))
 
 
 if __name__ == "__main__":

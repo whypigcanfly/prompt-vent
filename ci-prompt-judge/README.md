@@ -79,14 +79,25 @@ ci-prompt-judge/
 
 ## 五、安装
 
-### 方式一：一键脚本（推荐）
+### 方式一：一行命令自动安装（推荐，无需 clone）
+
+以 Claude Code 为例，终端执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/whypigcanfly/prompt-vent/main/ci-prompt-judge/install.sh | bash -s -- claude_code
+```
+
+脚本会自动：下载源码包 → `pip install` 安装 `ci-pj` 命令 → 生成适配文件 → **自动注册全局钩子**（无需 clone、无需手动改配置）。重启对应 Agent 后生效。
+
+其他 Agent：把 `claude_code` 换成 `codex` / `hermes` / `workbuddy`。
+
+### 方式二：本地脚本（已 clone 仓库）
 
 ```bash
 cd ci-prompt-judge
-bash install.sh
+bash install.sh                # 交互式选择 Agent
+bash install.sh claude_code    # 或直接指定
 ```
-
-脚本会安装 `ci-pj` 命令，并交互式生成目标 Agent 的适配文件。
 
 ### 方式二：手动
 
@@ -115,12 +126,25 @@ ci-pj install workbuddy
 
 | Agent | 命令文件位置 | 前置拦截 |
 |-------|-------------|----------|
-| Claude Code | `.claude/commands/pj-*.md` + 合并 `settings.json` 的 `UserPromptSubmit` 钩子 | `ci-pj hook` 读取 stdin |
+| Claude Code | `~/.claude/commands/pj-*.md`（用户级） | **安装时自动注册**全局 `UserPromptSubmit` 钩子（每次提交消息自动点评） |
 | Codex | `.codex/commands/pj-*.md`（按版本核对） | 注册 PreTool/UserPrompt 钩子 |
-| Hermes | `.hermes/commands/pj-*.md` | 输入预处理挂载 `ci-pj hook` |
+| Hermes | `~/.hermes/skills/ci-prompt-judge/SKILL.md`（用户级，自动注册斜杠命令） | **安装时自动注册** Shell Hook `pre_llm_call`（每轮用户消息自动点评，评判以 `{"context": ...}` 注入） |
 | WorkBuddy | `~/.workbuddy/skills/ci-prompt-judge/SKILL.md` | **安装时自动注册**全局 `UserPromptSubmit` 钩子（每次提交消息自动点评） |
 
-> 钩子仅做**装饰性输出**，不影响原 Prompt 执行；不想自动点评时删除钩子即可，仍可手动 `/pj-judge`。
+> 钩子仅做**装饰性输出**，不影响原 Prompt 执行；不想自动点评时运行 `ci-pj uninstall <agent>` 移除钩子即可，仍可手动 `/pj-judge`。
+
+### Claude Code 自动注册全局钩子（重点）
+
+`ci-pj install claude_code` 会做三件事：
+
+1. 把 slash 命令写入 `~/.claude/commands/`（用户级，所有项目可用）；
+2. 写入钩子驱动脚本 `~/.claude/ci-pj/hook_driver.sh`（自动探测 ci-pj 安装位置，找不到则静默放行）；
+3. **自动把 `UserPromptSubmit` 钩子合并进 `~/.claude/settings.json`**（带时间戳备份、幂等去重，不影响已有 hooks 与其他配置）。
+
+这样**每次你在 Claude Code 提交消息，都会先自动运行 `ci-pj hook` 做趣味前置点评**。重启 Claude Code 后生效。
+
+- 卸载：`ci-pj uninstall claude_code`（移除钩子 + 精确删除本插件的 `pj-*.md` 与驱动脚本，**不碰**你自己的其他命令文件，保留核心包）。
+- 指定 `--target-dir` 时仅生成文件到 `<target>/.claude/`，不改动全局配置（便于打包/二次分发）。
 
 ### WorkBuddy 自动注册全局钩子（重点）
 
