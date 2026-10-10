@@ -128,6 +128,50 @@ class TestHookJsonOutput(unittest.TestCase):
         self.assertTrue(payload["systemMessage"].startswith("【"))
 
 
+class TestPersonaAndJudgeCommands(unittest.TestCase):
+    """issue #3：动态人设切换 + /pj-judge 指令注册。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.engine = _make_engine(self.tmp)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_parse_command_judge_registered(self):
+        ctype, arg = self.engine.parse_command("/pj-judge 帮我写个脚本")
+        self.assertEqual(ctype, "judge")
+        self.assertEqual(arg, "帮我写个脚本")
+
+    def test_judge_strips_prefix_before_scoring(self):
+        result = self.engine.process("/pj-judge 帮我写一封辞职信")
+        self.assertEqual(result["kind"], "judge")
+        # 被评判文本不含指令前缀（若带前缀会命中不同评分）
+        self.assertNotIn("/pj-judge", result["text"])
+
+    def test_mode_accepts_builtin_persona(self):
+        result = self.engine.process("/pj-mode 贴吧老哥")
+        self.assertEqual(result["kind"], "mode")
+        self.assertIn("贴吧老哥", result["text"])
+
+    def test_mode_accepts_user_added_persona(self):
+        self.engine.personas.setdefault("personas", {})["毒舌产品经理"] = {
+            "style": "犀利", "fallback": []}
+        result = self.engine.process("/pj-mode 毒舌产品经理")
+        self.assertEqual(result["kind"], "mode")
+        self.assertEqual(self.engine.store.get_mode(), "毒舌产品经理")
+
+    def test_mode_rejects_unknown_persona(self):
+        result = self.engine.process("/pj-mode 不存在的人设")
+        self.assertEqual(result["kind"], "mode_help")
+
+    def test_status_lists_user_persona(self):
+        self.engine.personas.setdefault("personas", {})["毒舌产品经理"] = {
+            "style": "犀利", "fallback": []}
+        result = self.engine.process("/pj-status")
+        self.assertIn("毒舌产品经理", result["text"])
+
+
 class TestHookTextFallback(unittest.TestCase):
     """text 回退模式：保持旧行为（纯文本 stdout）。"""
 
