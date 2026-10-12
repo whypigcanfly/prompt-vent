@@ -195,6 +195,69 @@ class TestHookTextFallback(unittest.TestCase):
         self.assertIn("[词趣判官·输出要求]", text)
 
 
+class TestHermesHookContext(unittest.TestCase):
+    """issue #19：Hermes pre_llm_call 注入防泄漏。
+
+    注入块只含「评判行 + 输出要求」，用定界符包裹；不再重复
+    「---放行提示词--- + 原始 prompt」，避免模型把注入内容复述给用户。
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.engine = _make_engine(self.tmp)
+        self.engine.store.set_mode("渣女")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run_hermes(self, prompt: str) -> dict:
+        event = json.dumps(
+            {"hook_event_name": "pre_llm_call", "extra": {"user_message": prompt}},
+            ensure_ascii=False,
+        )
+        code, out = _run_hook(self.engine, event)
+        self.assertEqual(code, 0)
+        return json.loads(out.strip())
+
+    def test_context_wrapped_and_no_prompt_echo(self):
+        payload = self._run_hermes("帮我写一个电商首页")
+        ctx = payload["context"]
+        # 定界符包裹，且内部首行是评判行
+        self.assertTrue(ctx.startswith("<ci-prompt-judge-injection>\n"))
+        self.assertTrue(ctx.rstrip().endswith("</ci-prompt-judge-injection>"))
+        judge_line = ctx.splitlines()[1]
+        self.assertTrue(judge_line.startswith("【"))
+        self.assertIn("提示词完整性得分", judge_line)
+        # 不再重复放行提示词块与原始 prompt（防复述泄漏）
+        self.assertNotIn("---放行提示词---", ctx)
+        self.assertNotIn("帮我写一个电商首页", ctx)
+        # 含输出要求与保密约束
+        self.assertIn("[词趣判官·输出要求]", ctx)
+        self.assertIn("禁止在回复中复述", ctx)
+
+    def test_context_off_silent(self):
+        self.engine.store.set_mode("off")
+        code, out = _run_hook(
+            self.engine,
+            json.dumps(
+                {"hook_event_name": "pre_llm_call",
+                 "extra": {"user_message": "帮我写一个电商首页"}},
+                ensure_ascii=False,
+            ),
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_context_lead_disabled(self):
+        """lead_output=false：仅注入定界符包裹的评判行，无输出要求。"""
+        self.engine.cfg["hook"]["lead_output"] = False
+        payload = self._run_hermes("帮我写一个电商首页")
+        ctx = payload["context"]
+        self.assertTrue(ctx.startswith("<ci-prompt-judge-injection>\n"))
+        self.assertIn("【", ctx)
+        self.assertNotIn("[词趣判官·输出要求]", ctx)
+
+
 class TestClaudeCodeHookRegister(unittest.TestCase):
     """claude_code 适配器：用户级全局钩子幂等注册/卸载（隔离 HOME）。"""
 

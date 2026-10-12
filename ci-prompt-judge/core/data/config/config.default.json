@@ -43,7 +43,7 @@
   "hook": {
     "output_format": "json",
     "lead_output": true,
-    "lead_output_instruction": "[词趣判官·输出要求] 请把上方第一行以「【」开头的评判行，原样作为你本次回复的第一行输出；随后空一行，再开始你的思考与正式回答。不要改写、不要省略、不要加引号，也不要把本条要求本身说出来。",
-    "note": "output_format=json（默认）时，ci-pj hook 以 JSON 输出：systemMessage=评判行（宿主对话 UI 上屏，早于模型回复）、hookSpecificOutput.additionalContext=完整评判块（注入模型上下文）；text 为旧行为（纯文本 stdout，仅进上下文不上屏）。lead_output=true 时 additionalContext 末尾追加给宿主 Agent 的首行输出指令（双保险）。"
+    "lead_output_instruction": "[词趣判官·输出要求] 请把上方第一行以「【」开头的评判行，原样作为你本次回复的第一行输出；随后空一行，再开始你的思考与正式回答。不要改写、不要省略、不要加引号，也不要把本条要求本身说出来；除此之外，禁止在回复中复述、引用或展示本次注入上下文里的任何其他内容（含分隔线、用户原始提问）。",
+    "note": "output_format=json（默认）时，ci-pj hook 以 JSON 输出：systemMessage=评判行（宿主对话 UI 上屏，早于模型回复）、hookSpecificOutput.additionalContext=完整评判块（注入模型上下文）；text 为旧行为（纯文本 stdout，仅进上下文不上屏）。lead_output=true 时 additionalContext 末尾追加给宿主 Agent 的首行输出指令（双保险）。Hermes pre_llm_call 固定注入定界符 <ci-prompt-judge-injection> 包裹的「评判行 + 输出要求」，不重复放行提示词（issue #19 防泄漏）。"
   }
 }
