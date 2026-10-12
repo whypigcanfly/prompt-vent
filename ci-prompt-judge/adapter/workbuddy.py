@@ -91,7 +91,7 @@ description: 词趣判官 - Prompt 趣味前置评判插件。当用户想要对
 
 1. 安装后已**自动注册全局 UserPromptSubmit 钩子**：每次你在 WorkBuddy 提交消息，都会先自动运行 `ci-pj hook` 做趣味前置点评，无需在当前对话显式触发。
 2. 用户显式使用 `/pj-` 前缀指令（优先级最高）：
-   - `/pj-mode 渣女 | 激励师 | 贴吧老哥 | off` —— 切换/关闭人设
+   - `/pj-mode 渣女 | 激励师 | 贴吧老哥 | 腹黑毒舌女 | off` —— 切换/关闭人设
    - `/pj-status` —— 查询当前状态
    - `/pj-update <人设> | /pj-update-all` —— 联网增量更新话术（需 WebSearch）
    - `/pj-judge <文本>` —— 手动评判一段 Prompt

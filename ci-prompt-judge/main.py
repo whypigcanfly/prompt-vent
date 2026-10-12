@@ -3,7 +3,7 @@
 
 子命令：
   run "<文本>"            完整处理：识别 /pj- 控制指令并执行，否则做前置趣味评判
-  mode <渣女|激励师|贴吧老哥|off>   切换/关闭插件
+  mode <渣女|激励师|贴吧老哥|腹黑毒舌女|off>   切换/关闭插件
   status                  查询当前状态
   update [<人设>|all]     触发联网话术增量更新（需宿主 WebSearch 支持）
   diagnose "<文本>"       仅返回匹配/评分分析（不输出评判），便于调试
@@ -258,7 +258,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.set_defaults(func=cmd_run)
 
     pm = sub.add_parser("mode", help="切换人设 / 关闭")
-    pm.add_argument("name", help="渣女 | 激励师 | 贴吧老哥 | off")
+    pm.add_argument("name", help="渣女 | 激励师 | 贴吧老哥 | 腹黑毒舌女 | off")
     pm.set_defaults(func=cmd_mode)
 
     ps = sub.add_parser("status", help="查询状态")

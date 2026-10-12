@@ -2,7 +2,7 @@
   "schema_version": 1,
   "plugin_version": "0.1.0",
   "default_mode": "激励师",
-  "modes": ["渣女", "激励师", "贴吧老哥", "off"],
+  "modes": ["渣女", "激励师", "贴吧老哥", "腹黑毒舌女", "off"],
   "scoring": {
     "weights": {
       "intent": 0.30,
