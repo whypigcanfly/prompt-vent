@@ -97,12 +97,20 @@ find_ci_pj() {
   return 1
 }
 
+# 解析真实路径（readlink -f 不可用时退回原始路径，仅用于比较）
+realpath_or_raw() {
+  local p
+  p="$(readlink -f "$1" 2>/dev/null || true)"
+  echo "${p:-$1}"
+}
+
 PJ_BIN_DIR=""
 if PJ_BIN_DIR="$(find_ci_pj)"; then
   CI_PJ_BIN="$PJ_BIN_DIR/ci-pj"
   # PATH 上另有别的 ci-pj（旧版残留）→ 显式警告，避免用户误用旧逻辑
+  # （PATH 解析结果可能是软链，先解析真实路径再比较，避免把新软链误判为旧版）
   PATH_PJ="$(command -v ci-pj 2>/dev/null || true)"
-  if [ -n "${PATH_PJ}" ] && [ "${PATH_PJ}" != "${CI_PJ_BIN}" ]; then
+  if [ -n "${PATH_PJ}" ] && [ "$(realpath_or_raw "$PATH_PJ")" != "$(realpath_or_raw "$CI_PJ_BIN")" ]; then
     echo "⚠️  PATH 上的 ci-pj (${PATH_PJ}) 为旧版残留，本次安装将使用新版：${CI_PJ_BIN}" >&2
     echo "    建议清理旧版避免混淆：rm ${PATH_PJ}" >&2
   fi
@@ -115,6 +123,34 @@ if [ -z "$CI_PJ_BIN" ]; then
 fi
 
 echo "ci-pj 版本：$("$CI_PJ_BIN" --version 2>/dev/null || echo '未知（旧版无 --version，说明 PATH 上是旧残留，请按上方提示清理）')"
+
+# ---------- 2.5) 保证 ci-pj 命令在 PATH 上可用（issue #13）----------
+# pip --user 安装会把 ci-pj 落在 user-site bin（如 ~/Library/Python/3.9/bin），
+# 该目录默认不在 PATH，终端会报 command not found。
+# 方案A：软链到几乎总在 PATH 上的 ~/.local/bin；若该目录也不在 PATH 则给出明确提示。
+LOCAL_BIN="$HOME/.local/bin"
+RESOLVED_PJ="$(command -v ci-pj 2>/dev/null || true)"
+if [ "$(realpath_or_raw "${RESOLVED_PJ:-/nonexistent}")" != "$(realpath_or_raw "$CI_PJ_BIN")" ]; then
+  mkdir -p "$LOCAL_BIN"
+  LINK="$LOCAL_BIN/ci-pj"
+  if [ -e "$LINK" ] && [ ! -L "$LINK" ]; then
+    OLD_BAK="$LINK.bak-$(date +%Y%m%d%H%M%S)"
+    mv "$LINK" "$OLD_BAK"
+    echo "检测到 $LINK 为旧版残留（非软链），已备份为：$OLD_BAK"
+  fi
+  ln -sfn "$CI_PJ_BIN" "$LINK"
+  echo "已创建软链：$LINK -> $CI_PJ_BIN"
+  RESOLVED_PJ="$(command -v ci-pj 2>/dev/null || true)"
+fi
+if [ "$(realpath_or_raw "${RESOLVED_PJ:-/nonexistent}")" != "$(realpath_or_raw "$CI_PJ_BIN")" ]; then
+  case ":$PATH:" in
+    *":$LOCAL_BIN:"*)
+      echo "⚠️  新终端里 ci-pj 仍指向 ${RESOLVED_PJ:-无}，可能被 PATH 上更靠前的旧版遮蔽，请清理旧版。" >&2 ;;
+    *)
+      echo "⚠️  $LOCAL_BIN 不在 PATH，请将下面一行加入 ~/.zshrc（或 ~/.bashrc）后重开终端：" >&2
+      echo '    export PATH="$HOME/.local/bin:$PATH"' >&2 ;;
+  esac
+fi
 
 # ---------- 3) 确定要适配的 Agent ----------
 TARGETS=()
@@ -156,6 +192,7 @@ done
 
 echo
 echo "== 安装完成 =="
+echo "若当前终端提示 command not found，执行 rehash（zsh）或重开终端即可。"
 echo "试试：ci-pj status"
 echo "切换人设：ci-pj mode 渣女"
 echo "评判一段：ci-pj run \"帮我写一封辞职信，语气要体面\""
