@@ -174,7 +174,7 @@ class Engine:
             else:
                 text = f"角色「{arg}」更新完成：新增 {rep['added']} 条，现存 {rep['total']} 条。"
             return {"kind": "update", "text": text, "report": rep}
-        return {"kind": "update_help", "text": "用法：/pj-update <渣女|激励师|贴吧老哥> | /pj-update-all"}
+        return {"kind": "update_help", "text": "用法：/pj-update <渣女|激励师|贴吧老哥|腹黑毒舌女> | /pj-update-all"}
 
     # ---------- 便捷诊断 ----------
     def diagnose(self, prompt: str) -> Dict[str, Any]:
